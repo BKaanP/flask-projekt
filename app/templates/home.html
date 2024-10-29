@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>TEX 10 Tabelle</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+    <style>
+        .form-control-sm {
+            width: 100%;
+        }
+        .table th, .table td {
+            vertical-align: middle;
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
+        }
+        .sort-icon {
+            margin-left: 5px;
+            cursor: pointer;
+        }
+        .btn-link {
+            color: inherit;
+        }
+        .btn-link:hover {
+            text-decoration: none;
+        }
+
+        .table td.comment-cell,
+        .table td.aussage-cell,
+        .table td.kriterien-cell,
+        .table td.anregung-cell {
+            max-width: 200px;
+        }
+
+        .table td.comment-cell .comment-content {
+            max-height: 100px;
+            overflow: auto;
+        }
+        .table {
+            table-layout: fixed;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <h1>TEX 10 Tabelle</h1>
+    <button class="btn btn-primary mb-3" onclick="openAddZielModal()">Neues Ziel hinzufügen</button>
+    <a href="{{ url_for('grafik') }}" class="btn btn-secondary mb-3 ml-2">Grafische Auswertung</a>
+    <span class="ml-3 font-weight-bold">Durchschnittliche Bewertung: <span id="durchschnittswert">0</span></span>
+    <table class="table">
+        <colgroup>
+        <col style="width: 5%;">
+        <col style="width: 10%;">
+        <col style="width: 15%;">
+        <col style="width: 10%;">
+        <col style="width: 10%;">
+        <col style="width: 15%;">
+        <col style="width: 10%;">
+        <col style="width: 10%;">
+        <col style="width: 15%;">
+        <col style="width: 10%;">
+    </colgroup>
+        <thead>
+            <tr>
+                <th></th>
+                <th>Abteilung</th>
+                <th>Aussage</th>
+                <th>Kriterien</th>
+                <th>Bewertung <i id="sortBewertungIcon" class="fas fa-sort sort-icon" onclick="sortTable('bewertung')"></i></th>
+                <th>Kommentar</th>
+                <th>Zuletzt geändert <i id="sortDatumIcon" class="fas fa-sort sort-icon" onclick="sortTable('letzte_aenderung')"></i></th>
+                <th>Änderer</th>
+                <th>Anregung</th>
+                <th>Aktionen</th>
+            </tr>
+            <tr class="search-row">
+                <th></th>
+                <th><input type="text" class="form-control form-control-sm" id="searchAbteilung" placeholder="Suche" oninput="submitSearchForm()"></th>
+                <th><input type="text" class="form-control form-control-sm" id="searchAussage" placeholder="Suche" oninput="submitSearchForm()"></th>
+                <th><input type="text" class="form-control form-control-sm" id="searchKriterien" placeholder="Suche" oninput="submitSearchForm()"></th>
+                <th></th>
+                <th><input type="text" class="form-control form-control-sm" id="searchKommentar" placeholder="Suche" oninput="submitSearchForm()"></th>
+                <th></th>
+                <th><input type="text" class="form-control form-control-sm" id="searchGeaendertVon" placeholder="Suche" oninput="submitSearchForm()"></th>
+                <th><input type="text" class="form-control form-control-sm" id="searchAnregung" placeholder="Suche" oninput="submitSearchForm()"></th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+                {% for ziel in ziele %}
+                <tr>
+                    <td>
+                        <input type="checkbox" class="ziel-checkbox" data-bewertung="{{ ziel.bewertung }}">
+                    </td>
+                    <td>{{ ziel.abteilung }}</td>
+                    <td class="aussage-cell">{{ ziel.aussage }}</td>
+                    <td class="kriterien-cell">{{ ziel.kriterien }}</td>
+                    <td>{{ ziel.bewertung }}</td>
+                    <td class="comment-cell">
+                        <div class="comment-content">{{ ziel.kommentare or '' }}</div>
+                    </td>
+                    <td>{{ ziel.letzte_aenderung }}</td>
+                    <td>{{ ziel.geaendert_von or 'N/A' }}</td>
+                    <td class="anregung-cell">{{ ziel.anregung }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-link text-secondary" onclick="openEditModal({{ ziel.id }})" title="Bearbeiten">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-link text-danger" onclick="openDeleteModal({{ ziel.id }})" title="Löschen">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                        <button class="btn btn-sm btn-link text-info" onclick="loadHistorie({{ ziel.id }})" data-toggle="modal" data-target="#historieModal" title="Historie">
+                            <i class="fas fa-history"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+    </table>
+</div>
+
+<div class="modal fade" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addModalLabel">Neues Ziel hinzufügen</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="addForm">
+                    <div class="form-group">
+                        <label for="addAbteilung">Abteilung</label>
+                        <input type="text" class="form-control" id="addAbteilung" required maxlength="50">
+                    </div>
+                    <div class="form-group">
+                        <label for="addAussage">Aussage</label>
+                        <input type="text" class="form-control" id="addAussage" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="addKriterien">Kriterien</label>
+                        <input type="text" class="form-control" id="addKriterien" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="addBewertung">Bewertung</label>
+                        <input type="number" class="form-control" id="addBewertung" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="addEinschaetzung">Einschätzung</label>
+                        <input type="text" class="form-control" id="addEinschaetzung">
+                    </div>
+                    <div class="form-group">
+                        <label for="addKommentar">Kommentar</label>
+                        <textarea class="form-control" id="addKommentar"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="addGeaendertVon">Geändert von</label>
+                        <input type="text" class="form-control" id="addGeaendertVon" required maxlength="50">
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="submitAddForm()">Hinzufügen</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="historieModal" tabindex="-1" aria-labelledby="historieModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="historieModalLabel">Ziel Historie</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Änderung</th>
+                            <th>Änderer</th>
+                            <th>Bewertung</th>
+                            <th>Kommentar</th>
+                            <th>Anregung</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historieContent"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ziel bearbeiten</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm">
+                    <input type="hidden" id="editZielId">
+                     <div class="form-group">
+                <label for="editAbteilung">Abteilung</label>
+                <input type="text" class="form-control" id="editAbteilung" required>
+            </div>
+            <div class="form-group">
+                <label for="editAussage">Aussage</label>
+                <input type="text" class="form-control" id="editAussage" required>
+            </div>
+            <div class="form-group">
+                <label for="editKriterien">Kriterien</label>
+                <input type="text" class="form-control" id="editKriterien" required>
+            </div>
+            <div class="form-group">
+                <label for="editBewertung">Bewertung</label>
+                <input type="number" class="form-control" id="editBewertung" required>
+            </div>
+            <div class="form-group">
+                <label for="editEinschaetzung">Einschätzung</label>
+                <input type="text" class="form-control" id="editEinschaetzung">
+            </div>
+            <div class="form-group">
+                <label for="editKommentar">Kommentar</label>
+                <textarea class="form-control" id="editKommentar"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="editGeaendertVon">Geändert von</label>
+                <input type="text" class="form-control" id="editGeaendertVon">
+            </div>
+            <div class="form-group">
+                <label for="editAnregung">Anregung</label>
+                <textarea class="form-control" id="editAnregung"></textarea>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="submitEditForm()">Speichern</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ziel löschen</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Möchtest du dieses Ziel wirklich löschen?</p>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">Löschen</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentSortColumn = '';
+    let currentSortOrder = 'asc';
+
+    function sortTable(column) {
+        if (currentSortColumn === column) {
+            currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSortColumn = column;
+            currentSortOrder = 'asc';
+        }
+
+        $('#sortBewertungIcon').attr('class', 'fas fa-sort sort-icon');
+        $('#sortDatumIcon').attr('class', 'fas fa-sort sort-icon');
+
+        let iconClass = currentSortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down';
+        if (column === 'bewertung') {
+            $('#sortBewertungIcon').attr('class', 'fas ' + iconClass + ' sort-icon');
+        } else if (column === 'letzte_aenderung') {
+            $('#sortDatumIcon').attr('class', 'fas ' + iconClass + ' sort-icon');
+        }
+
+        submitSearchForm();
+    }
+
+    function submitSearchForm() {
+        const searchParams = {
+            abteilung: $("#searchAbteilung").val(),
+            aussage: $("#searchAussage").val(),
+            kriterien: $("#searchKriterien").val(),
+            kommentar: $("#searchKommentar").val(),
+            geaendert_von: $("#searchGeaendertVon").val(),
+            anregung: $("#searchAnregung").val(),
+            sortColumn: currentSortColumn,
+            sortOrder: currentSortOrder
+        };
+
+        $.ajax({
+            url: "/search",
+            method: "GET",
+            data: searchParams,
+            success: function(data) {
+                updateTable(data.ziele);
+            }
+        });
+    }
+
+    function updateTable(ziele) {
+        let tbodyContent = "";
+        ziele.forEach(function(ziel) {
+            tbodyContent += `
+                <tr>
+                    <td>
+                        <input type="checkbox" class="ziel-checkbox" data-bewertung="${ziel.bewertung}">
+                    </td>
+                    <td>${ziel.abteilung}</td>
+                    <td>${ziel.aussage}</td>
+                    <td>${ziel.kriterien}</td>
+                    <td>${ziel.bewertung}</td>
+                    <td>${ziel.kommentare || ''}</td>
+                    <td>${ziel.letzte_aenderung || 'N/A'}</td>
+                    <td>${ziel.geaendert_von || 'N/A'}</td>
+                    <td>${ziel.anregung || ''}</td>
+                    <td>
+                        <button class="btn btn-sm btn-link text-secondary" onclick="openEditModal(${ziel.id})" title="Bearbeiten">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-link text-danger" onclick="openDeleteModal(${ziel.id})" title="Löschen">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                        <button class="btn btn-sm btn-link text-info" onclick="loadHistorie(${ziel.id})" data-toggle="modal" data-target="#historieModal" title="Historie">
+                            <i class="fas fa-history"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        $("table tbody").html(tbodyContent);
+
+        berechneDurchschnitt();
+    }
+
+    function openAddZielModal() {
+        $("#addModal").modal("show");
+    }
+
+    function openEditModal(zielId) {
+        $.ajax({
+            url: "/get_ziel/" + zielId,
+            method: "GET",
+            success: function(data) {
+                $("#editZielId").val(zielId);
+                $("#editAbteilung").val(data.ziel.abteilung);
+                $("#editAussage").val(data.ziel.aussage);
+                $("#editKriterien").val(data.ziel.kriterien);
+                $("#editBewertung").val(data.ziel.bewertung);
+                $("#editEinschaetzung").val(data.ziel.einschaetzung);
+                $("#editKommentar").val(data.ziel.kommentare);
+                $("#editGeaendertVon").val(data.ziel.geaendert_von);
+                $("#editAnregung").val("");
+                $("#editModal").modal("show");
+            }
+        });
+    }
+
+    function submitAddForm() {
+        $.ajax({
+            url: "/add_ziel",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({
+                abteilung: $("#addAbteilung").val(),
+                aussage: $("#addAussage").val(),
+                kriterien: $("#addKriterien").val(),
+                bewertung: $("#addBewertung").val(),
+                einschaetzung: $("#addEinschaetzung").val(),
+                kommentare: $("#addKommentar").val(),
+                geaendert_von: $("#addGeaendertVon").val()
+            }),
+            success: function() {
+                $("#addModal").modal("hide");
+                submitSearchForm();
+            }
+        });
+    }
+
+    function submitEditForm() {
+        const zielId = $("#editZielId").val();
+        $.ajax({
+            url: "/edit_ziel/" + zielId,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({
+                abteilung: $("#editAbteilung").val(),
+                aussage: $("#editAussage").val(),
+                kriterien: $("#editKriterien").val(),
+                bewertung: $("#editBewertung").val(),
+                einschaetzung: $("#editEinschaetzung").val(),
+                kommentare: $("#editKommentar").val(),
+                geaendert_von: $("#editGeaendertVon").val(),
+                anregung: $("#editAnregung").val()
+            }),
+            success: function() {
+                $("#editModal").modal("hide");
+                submitSearchForm();
+            }
+        });
+    }
+
+    function openDeleteModal(zielId) {
+        $("#deleteModal").data("ziel-id", zielId).modal("show");
+    }
+
+    function confirmDelete() {
+        const zielId = $("#deleteModal").data("ziel-id");
+        $.ajax({
+            url: "/delete_ziel/" + zielId,
+            method: "DELETE",
+            success: function() {
+                $("#deleteModal").modal("hide");
+                submitSearchForm();
+            }
+        });
+    }
+
+    function loadHistorie(zielId) {
+        $.ajax({
+            url: "/get_historie/" + zielId,
+            method: "GET",
+            success: function(data) {
+                let historieContent = "";
+                data.historie.forEach(function(historie) {
+                    historieContent += `
+                        <tr>
+                            <td>${historie.datum_aenderung || "N/A"}</td>
+                            <td>${historie.geaendert_von}</td>
+                            <td>${historie.bewertung}</td>
+                            <td>${historie.einschaetzung}</td>
+                            <td>${historie.anregung}</td>
+                        </tr>
+                    `;
+                });
+                $("#historieContent").html(historieContent);
+            }
+        });
+    }
+
+    function berechneDurchschnitt() {
+    let bewertungen = [];
+    const checkboxes = document.querySelectorAll('.ziel-checkbox');
+
+    checkboxes.forEach(function(checkbox) {
+        const bewertung = parseFloat(checkbox.getAttribute('data-bewertung'));
+        if (checkbox.checked) {
+            bewertungen.push(bewertung);
+        }
+    });
+
+    if (bewertungen.length === 0) {
+        checkboxes.forEach(function(checkbox) {
+            const bewertung = parseFloat(checkbox.getAttribute('data-bewertung'));
+            bewertungen.push(bewertung);
+        });
+    }
+
+    const summe = bewertungen.reduce((a, b) => a + b, 0);
+    const durchschnitt = (summe / bewertungen.length).toFixed(2);
+
+    document.getElementById('durchschnittswert').innerText = durchschnitt;
+    }
+
+    $(document).ready(function() {
+        submitSearchForm();
+        berechneDurchschnitt();
+    });
+
+    $(document).on('change', '.ziel-checkbox', function() {
+        berechneDurchschnitt();
+    });
+
+    $(document).ready(function() {
+        submitSearchForm();
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Grafische Auswertung</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
+</head>
+<body>
+<div class="container-fluid">
+    <h1>Grafische Auswertung</h1>
+    <a href="{{ url_for('home') }}" class="btn btn-secondary mb-3">Zurück zur Übersicht</a>
+
+    <div class="mb-3">
+        <h4>Filter:</h4>
+        <form id="filterForm" class="form-inline">
+            <label for="abteilungSelect" class="mr-2">Abteilung(en):</label>
+            <select id="abteilungSelect" class="form-control mr-3" multiple>
+                {% for abteilung in abteilungen %}
+                <option value="{{ abteilung }}">{{ abteilung }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="startDate" class="mr-2">Startdatum:</label>
+            <input type="date" id="startDate" class="form-control mr-3" value="{{ default_start_date }}">
+
+            <label for="endDate" class="mr-2">Enddatum:</label>
+            <input type="date" id="endDate" class="form-control mr-3" value="{{ default_end_date }}">
+
+
+            <button type="button" class="btn btn-primary" onclick="updateChart()">Aktualisieren</button>
+        </form>
+    </div>
+
+    <canvas id="bewertungChart" width="800" height="400"></canvas>
+</div>
+
+<script>
+    let chart = null;
+    let colorIndex = 0;
+    function updateChart() {
+    const abteilungSelect = document.getElementById('abteilungSelect');
+    const selectedOptions = Array.from(abteilungSelect.selectedOptions).map(option => option.value);
+
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+
+    console.log('Ausgewählte Abteilungen:', selectedOptions);
+    console.log('Startdatum:', startDate);
+    console.log('Enddatum:', endDate);
+
+    fetch('{{ url_for("get_chart_data") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            abteilungen: selectedOptions,
+            startDate: startDate,
+            endDate: endDate
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Erhaltene Daten vom Server:', JSON.stringify(data, null, 2));
+        const daten = data.daten;
+
+        if (Object.keys(daten).length === 0) {
+            if (chart !== null) {
+                chart.destroy();
+            }
+            alert('Keine Daten für die ausgewählten Kriterien vorhanden.');
+            return;
+        }
+        colorIndex =0;
+        const datasets = [];
+
+        for (const [abteilung, eintraege] of Object.entries(daten)) {
+            const dataPoints = eintraege.map(entry => ({
+                x: entry.datum,
+                y: entry.bewertung
+            }));
+
+            datasets.push({
+                label: abteilung,
+                data: dataPoints,
+                fill: false,
+                borderColor: getDistinctColor(),
+                tension: 0.1
+            });
+        }
+
+        if (chart !== null) {
+            chart.destroy();
+        }
+
+        const ctx = document.getElementById('bewertungChart').getContext('2d');
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'day',
+                            tooltipFormat: 'DD.MM.YYYY',
+                            displayFormats: {
+                                day: 'DD.MM.YYYY'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Datum'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Bewertung'
+                        },
+                        suggestedMin: 0,
+                        suggestedMax: 10
+                    }
+                }
+            }
+        });
+    })
+    .catch(error => {
+        console.error('Fehler beim Abrufen der Daten:', error);
+        alert('Fehler beim Laden der Daten.');
+    });
+}
+
+
+    function getRandomColor() {
+        const r = Math.floor(Math.random() * 200);
+        const g = Math.floor(Math.random() * 200);
+        const b = Math.floor(Math.random() * 200);
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    function getDistinctColor(){
+        const hue = (colorIndex * 137.500) % 360;
+        colorIndex++;
+        return `hsl(${hue}, 70%, 50%)`;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        updateChart();
+    });
+</script>
+</body>
+</html>
